@@ -13,6 +13,7 @@ using namespace std;
 
 typedef int (*tex_fun_pointer)(float u, float v, GzColor color);
 
+float CLAMP (float value,float low,float high);
 short	ctoi(float color);
 int minBound(float x, float y, float z);
 int maxBound(float x, float y, float z);
@@ -471,6 +472,80 @@ void computePhongColor(GzRender *render, GzCoord normal, GzColor tex, GzColor co
     color[2] = fmin(color[2],1);
 }
 
+void computeHachingColor(GzRender *render, GzCoord normal, GzColor tex, GzColor color, int x, int y){
+	float ambient = 0.025f;
+    GzCoord lightVector;
+    memset(lightVector,0,sizeof(GzCoord));
+    GzCoord E = {0,0,-1};
+    for (int i = 0; i < render->numlights; ++i) {
+    	VectAdd(lightVector,lightVector,render->lights[i].direction);
+    }
+    VectNormalize(lightVector);
+    float NdotL;
+    float diffuse;
+    VectDot(&NdotL,lightVector,normal);
+    diffuse = CLAMP(NdotL,0,1);
+        
+    
+    // GzColor reflectedVector;
+    // memset(reflectedVector,0,sizeof(GzCoord));    
+    GzCoord R;
+    GzCoord tmp;
+    VectScale(2*NdotL,tmp,normal);
+    VectSub(R,tmp,lightVector);
+    float specular = 0;
+    float RdotE;
+    VectDot(&RdotE,R,E);
+	specular = pow(RdotE, render->spec);
+    float lightIntensity = CLAMP(diffuse + specular + ambient, 0, 1);
+    color[0] = 1;
+    color[1] = 1;
+    color[2] = 1;
+    if (lightIntensity < 0.85) 
+	{
+	   // hatch from left top corner to right bottom
+	   if ( ( (x + y) % 10 ) == 0) 
+	   {
+	   		color[0] = 0;
+    		color[1] = 0;
+    		color[2] = 0;
+	   }
+	}
+
+	if (lightIntensity < 0.75) 
+	{
+	   // hatch from right top corner to left boottom
+	   if ( ( (x - y) % 10 ) == 0) 
+	   {
+	      color[0] = 0;
+    		color[1] = 0;
+    		color[2] = 0;
+	   }
+	}
+
+	if (lightIntensity < 1) 
+	{
+	   // hatch from left top to right bottom
+	   if ( ( (x + y - 5) % 10 ) == 0) 
+	   {
+	      color[0] = 0;
+    		color[1] = 0;
+    		color[2] = 0;
+	   }
+	}
+
+	if (lightIntensity < 0.75) 
+	{
+	   // hatch from right top corner to left bottom
+	   if ( ( (x - y - 5) % 10 ) == 0) 
+	   {
+	      color[0] = 0;
+    		color[1] = 0;
+    		color[2] = 0;
+	   }
+	}
+}
+
 void computeXiw(GzRender *render){
 	GzCoord z;
 	VectSub(z,render->camera.lookat,render->camera.position);
@@ -734,8 +809,9 @@ int DrawTriangle(GzRender *render, GzCoord *valueList, GzCoord *normalList, GzTe
                     GzColor color;
                     interpolate(normalList[0],normalList[1],normalList[2],v0,v1,v2,normal);
                     VectNormalize(normal);
-                    computeGoochColor(render,normal,texColor,color);
+                    //computeGoochColor(render,normal,texColor,color);
 					//computePhongColor(render,normal,texColor,color);
+                    computeHachingColor(render,normal,texColor,color,x,y);
                     DrawPoint(render,color,x,y,round((-pD-pA*x-pB*y)/pC));
                 }
                 /*----------------- ADD FOR PROJECT ----------------------*/
@@ -790,4 +866,8 @@ short	ctoi(float color)		/* convert float color to GzIntensity short */
 {
   return(short)((int)(color * ((1 << 12) - 1)));
 }
+
+float CLAMP (float value,float low,float high) {
+	return (value < low ? low : (value > high ? high : value));	
+} 
 
