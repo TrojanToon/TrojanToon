@@ -7,13 +7,84 @@
 GzColor	*image;
 int xs, ys;
 int reset = 1;
-
+int reset_hatching = 1;
 void VectScale(float s, GzCoord sVect, GzCoord inp);
 
 void VectAdd(GzCoord sum, GzCoord a, GzCoord b);
 
 int idx(int x, int y) {
 	return x + y * xs;
+}
+
+// Texture Coordinate Mapping
+int pos(int x, int y){
+	if(x>xs-1){x = xs-1;}
+	if(y>ys-1){y = ys-1;}
+	return x + y * xs;
+}
+
+
+/* Image texture function */
+int tex_hatching(float intensity, float u, float v, GzColor color)
+{
+	unsigned char	pixel[3];
+	unsigned char	dummy;
+	char		foo[8];
+	int		i;
+	FILE		*fd;
+
+	if (reset_hatching) {          /* open and load texture file */
+		fd = fopen ("tex_hatching.ppm", "rb");
+		if (fd == NULL) {
+			fprintf (stderr, "texture file not found\n");
+			return GZ_FAILURE;
+		}
+		fscanf (fd, "%s %d %d %c", foo, &xs, &ys, &dummy);
+		image = (GzColor*)malloc(sizeof(GzColor)*xs*ys);
+		if (image == NULL) {
+			fprintf (stderr, "malloc for texture image failed\n");
+			return GZ_FAILURE;
+		}
+
+		for (i = 0; i < xs*ys; i++) {	/* create array of GzColor values */
+			fread(pixel, sizeof(pixel), 1, fd);
+			image[i][RED] = (float)((int)pixel[RED]) * (1.0 / 255.0);
+			image[i][GREEN] = (float)((int)pixel[GREEN]) * (1.0 / 255.0);
+			image[i][BLUE] = (float)((int)pixel[BLUE]) * (1.0 / 255.0);
+		}
+
+		reset_hatching = 0;          /* init is done */
+		fclose(fd);
+	}
+
+	/* bounds-test u,v to make sure nothing will overflow image array bounds */
+	/* determine texture cell corner values and perform bilinear interpolation */
+	/* set color to interpolated GzColor value and return */
+	if(intensity>=0.99){
+		color[0] = 255;
+		color[1] = 255;
+		color[2] = 255;
+		return GZ_SUCCESS;
+	}
+	if(intensity<0){intensity = 0;}
+	  int pid = (int)(intensity * 8) ;
+	  
+	  if(u<0){u = 0;}
+	  if(v<0){v = 0;}
+	  if(u>1){u = 1;}
+	  if(v>1){v = 1;}
+	  float uX = u * (xs)/8 -1;
+	  float uY = v * (ys)-1;
+	  int pX = (int)uX;
+	  int pY = (int)uY;
+	  float s = uX - pX;
+	  float t = uY - pY;
+	  pX = pX + pid * (xs)/8;
+	  //bilinear [interpolation
+	  for(int i=0;i<3;i++){
+		color[i] = s * t * image[pos(pX+1,pY+1)][i] + (1-s) * t * image[pos(pX,pY+1)][i] + s * (1-t) * image[pos(pX+1,pY)][i] + (1-s) * (1-t) * image[pos(pX,pY)][i];
+	  }
+	return GZ_SUCCESS;
 }
 
 /* Image texture function */

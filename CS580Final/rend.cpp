@@ -10,7 +10,7 @@
 #define Z_MAX (2e9)
 
 using namespace std;
-
+extern int tex_hatching(float intensity, float u, float v, GzColor color);
 typedef int (*tex_fun_pointer)(float u, float v, GzColor color);
 
 float CLAMP (float value,float low,float high);
@@ -331,6 +331,82 @@ void computeColor(GzRender *render, GzCoord normal, GzColor color){
     color[0] = fmin(color[0],1);
     color[1] = fmin(color[1],1);
     color[2] = fmin(color[2],1);
+}
+void computeHatchingColor(GzRender *render, GzCoord normal, GzColor tex, GzColor color, float x, float y){
+    
+	
+
+    GzColor specular;
+    memset(specular,0,sizeof(GzColor));
+    GzColor diffuse;
+    memset(diffuse,0,sizeof(GzColor));
+	float NdotL;
+    for (int i = 2; i < 3; ++i) {
+        
+        VectDot(&NdotL,render->lights[i].direction,normal);
+        if (NdotL < 0) {
+            VectScale(-1,normal,normal);
+            NdotL *= -1;
+        }
+        GzCoord E = {0,0,-1};
+        float NdotE;
+        VectDot(&NdotE,E,normal);
+        if (NdotE <= 0) {
+            continue;
+        }
+		
+		
+		float a[3];
+		a[0] =tex[0];
+		a[1] = tex[1];
+		a[2] = tex[2];
+		GzCoord IeNdotL;
+        VectScale(NdotL,IeNdotL,render->lights[i].color);
+        VectAdd(diffuse,diffuse,IeNdotL);
+
+
+
+
+        float RdotE;
+        GzCoord R;
+        GzCoord tmp;
+        VectScale(2*NdotL,tmp,normal);
+        VectSub(R,tmp,render->lights[i].direction);
+        VectDot(&RdotE,R,E);
+        RdotE = fmax(0.0f,RdotE);
+        GzCoord IeRdotEs;
+        VectScale(pow(RdotE,render->spec),IeRdotEs,render->lights[i].color);
+        VectAdd(specular,specular,IeRdotEs);
+    }
+
+    GzColor diffcolor;
+	
+	float specularAverage = (specular[0] + specular[1] + specular[2])/3;
+	if(specularAverage >0.05){
+		int i = 0;
+	}
+	float ambientAverage = (render->ambientlight.color[0] + render->ambientlight.color[1] + render->ambientlight.color[2])/3;
+	float intensity = specularAverage + ambientAverage +NdotL/3;// NdotL * Kd
+	//float intensity = NdotL;
+	if(intensity>1){
+		intensity = 0.99;
+	}
+	tex_hatching(intensity,x,y,tex);  
+    VectMul(color,tex,render->ambientlight.color);
+	VectMul(diffcolor,diffuse,tex);
+	
+
+
+
+    GzColor speccolor;
+    VectMul(speccolor,specular,render->Ks);
+    VectAdd(color,color,diffcolor);
+    VectAdd(color,color,speccolor);
+    
+    color[0] = fmin(color[0],1);
+    color[1] = fmin(color[1],1);
+    color[2] = fmin(color[2],1);
+
 }
 void computeGoochColor(GzRender *render, GzCoord normal, GzColor tex, GzColor color){
 
@@ -811,7 +887,8 @@ int DrawTriangle(GzRender *render, GzCoord *valueList, GzCoord *normalList, GzTe
                     VectNormalize(normal);
                     //computeGoochColor(render,normal,texColor,color);
 					//computePhongColor(render,normal,texColor,color);
-                    computeHachingColor(render,normal,texColor,color,x,y);
+                    //computeHachingColor(render,normal,texColor,color,x,y);
+					computeHatchingColor(render,normal,texColor,color,uv[0],uv[1]);
                     DrawPoint(render,color,x,y,round((-pD-pA*x-pB*y)/pC));
                 }
                 /*----------------- ADD FOR PROJECT ----------------------*/
